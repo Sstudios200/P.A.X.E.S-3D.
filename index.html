@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>PAXES 3D // OVERDRIVE - ULTRA EDITION BY SERHAT</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@600;900&family=Rajdhani:wght@700&display=swap');
+
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; touch-action: manipulation; }
+        body { background: #010105; color: #fff; font-family: 'Rajdhani', sans-serif; height: 100vh; overflow: hidden; display: flex; justify-content: center; align-items: center; }
+
+        #canvas-container { position: relative; width: 100vw; height: 100vh; }
+        canvas { width: 100%; height: 100%; display: block; }
+
+        /* CRT SCANLINE & VIGNETTE EFFECT */
+        #canvas-container::after {
+            content: " "; position: absolute; inset: 0;
+            background: radial-gradient(circle, transparent 60%, rgba(0, 0, 0, 0.8) 100%), linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+            z-index: 20; background-size: 100% 100%, 100% 4px; pointer-events: none;
+        }
+
+        /* HUD OVERLAY */
+        .hud-layer { position: absolute; inset: 0; pointer-events: none; z-index: 30; padding: 20px; display: flex; flex-direction: column; justify-content: space-between; }
+        .hud-top { display: flex; justify-content: space-between; align-items: flex-start; }
+        
+        .brand-box { font-family: 'Orbitron', sans-serif; font-weight: 900; font-size: 24px; color: #00f0ff; text-shadow: 0 0 15px #00f0ff; letter-spacing: 2px; }
+        .brand-box span { font-size: 11px; color: #ffe600; display: block; letter-spacing: 3px; text-shadow: 0 0 10px #ffe600; }
+
+        .stats-box { text-align: right; font-family: 'Orbitron', sans-serif; }
+        .stat-label { font-size: 11px; color: #557; letter-spacing: 2px; }
+        .stat-value { font-size: 32px; font-weight: 900; color: #ffe600; text-shadow: 0 0 15px #ffe600; }
+        .emp-status { font-size: 13px; color: #00f0ff; margin-top: 5px; text-shadow: 0 0 8px #00f0ff; }
+
+        .boss-warning { position: absolute; top: 15%; left: 50%; transform: translateX(-50%); font-family: 'Orbitron', sans-serif; font-size: 20px; font-weight: 900; color: #ff0055; text-shadow: 0 0 20px #ff0055; letter-spacing: 3px; display: none; animation: blink 0.6s infinite alternate; text-align: center; width: 90%; }
+        @keyframes blink { from { opacity: 0.3; } to { opacity: 1; } }
+
+        /* BUTTONS OBEN RECHTS & LINKS */
+        .btn-fullscreen {
+            position: absolute; top: 20px; right: 20px; z-index: 50;
+            font-family: 'Orbitron', sans-serif; font-size: 12px; font-weight: 900;
+            padding: 10px 16px; color: #00f0ff; background: rgba(0, 240, 255, 0.1);
+            border: 2px solid #00f0ff; cursor: pointer; box-shadow: 0 0 15px rgba(0, 240, 255, 0.4);
+            transition: all 0.2s; backdrop-filter: blur(5px);
+        }
+        .btn-fullscreen:hover { background: #00f0ff; color: #000; box-shadow: 0 0 25px #00f0ff; }
+
+        .btn-music {
+            position: absolute; top: 20px; left: 20px; z-index: 50;
+            font-family: 'Orbitron', sans-serif; font-size: 12px; font-weight: 900;
+            padding: 10px 16px; color: #ffe600; background: rgba(255, 230, 0, 0.1);
+            border: 2px solid #ffe600; cursor: pointer; box-shadow: 0 0 15px rgba(255, 230, 0, 0.4);
+            transition: all 0.2s; backdrop-filter: blur(5px);
+        }
+        .btn-music:hover { background: #ffe600; color: #000; box-shadow: 0 0 25px #ffe600; }
+
+        /* SCREENS */
+        .ui-screen { position: absolute; inset: 0; background: rgba(2, 2, 8, 0.92); backdrop-filter: blur(12px); z-index: 40; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 20px; }
+        .ui-screen.hidden { display: none; }
+        .ui-screen h1 { font-family: 'Orbitron', sans-serif; font-size: 52px; font-weight: 900; color: #00f0ff; text-shadow: 0 0 40px #00f0ff; margin-bottom: 5px; }
+        .ui-screen .sub { font-family: 'Orbitron', sans-serif; font-size: 13px; font-weight: 700; color: #ffe600; letter-spacing: 5px; margin-bottom: 25px; text-shadow: 0 0 12px #ffe600; }
+        .ui-screen p { color: #88a; font-size: 15px; margin-bottom: 30px; letter-spacing: 1px; line-height: 1.6; }
+
+        .btn-start { font-family: 'Orbitron', sans-serif; font-weight: 900; font-size: 18px; padding: 18px 45px; color: #000; background: #00f0ff; border: none; cursor: pointer; box-shadow: 0 0 35px #00f0ff; transition: all 0.2s; clip-path: polygon(10% 0, 100% 0, 90% 100%, 0 100%); }
+        .btn-start:hover { background: #fff; box-shadow: 0 0 50px #fff; transform: scale(1.05); }
+    </style>
+    <!-- Three.js Engine via CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+    <div id="canvas-container">
+        <!-- CONTROLS TOP BAR -->
+        <button class="btn-music" id="music-btn">🔊 MUSIC: ON</button>
+        <button class="btn-fullscreen" id="fs-btn">⛶ VOLLBILD</button>
+
+        <!-- HUD -->
+        <div class="hud-layer">
+            <div class="hud-top">
+                <div class="brand-box" style="margin-left: 140px;">PAXES 3D<span>ULTRA EDITION // BY SERHAT</span></div>
+                <div class="stats-box">
+                    <div class="stat-label">SCORE</div>
+                    <div class="stat-value" id="score-val">000000</div>
+                    <div class="emp-status" id="emp-val">EMP: READY [SPACE / DOUBLE TAP]</div>
+                </div>
+            </div>
+            <div class="boss-warning" id="boss-warn">⚠️ WARNING: CYBER-HUNTER X APPROACHING ⚠️</div>
+        </div>
+
+        <!-- Start Overlay -->
+        <div class="ui-screen" id="start-screen">
+            <h1>PAXES 3D</h1>
+            <div class="sub">DESIGNED & CODED BY SERHAT</div>
+            <p>
+                <b>TASTATUR:</b> A / D ODER PFEILE • LEERTASTE: EMP<br>
+                <b>HANDY:</b> NACH LINKS / RECHTS WISCHEN ZUM LENKEN<br>
+                <i>HINWEIS: FÜR BESTES ERLEBNIS OBEN RECHTS VOLLBILD AKTIVIEREN!</i>
+            </p>
+            <button class="btn-start" id="start-btn">IGNITE HIGH-DETAIL ENGINE</button>
+        </div>
+
+        <!-- Game Over Overlay -->
+        <div class="ui-screen hidden" id="over-screen">
+            <h1 style="color:#ff0055; text-shadow: 0 0 40px #ff0055;">SYSTEM DESTROYED</h1>
+            <div class="sub">GAME OVER • BY SERHAT</div>
+            <p id="final-stats">SCORE: 000000</p>
+            <button class="btn-start" id="restart-btn">REBOOT RUN</button>
+        </div>
+    </div>
+
+    <script>
+        // SOUND & MUSIC SYNTHESIZER ENGINE
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        let audioCtx = null;
+        let isMusicMuted = false;
+        let musicInterval = null;
+        let noteStep = 0;
+
+        // CYBERPUNK 8-BIT SYNTH MUSIC PATTERN (Frequenz-Tabelle)
+        const notes = [
+            110.00, 110.00, 220.00, 110.00, 130.81, 110.00, 146.83, 110.00, // A2 Bass Arp
+            98.00,  98.00,  196.00, 98.00,  130.81, 98.00,  146.83, 123.47,  // G2 Synth Lead
+            87.31,  87.31,  174.61, 87.31,  130.81, 87.31,  146.83, 130.81,  // F2 Dark Melody
+            82.41,  164.81, 246.94, 164.81, 220.00, 196.00, 174.61, 164.81   // E2 Cyber Outro
+        ];
+
+        function initAudioContext() {
+            if (!audioCtx) {
+                audioCtx = new AudioCtx();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playAudio(type) {
+            initAudioContext();
+            if (isMusicMuted && (type === 'bgm')) return;
+            
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+
+            if (type === 'shift') {
+                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(220, now); osc.frequency.exponentialRampToValueAtTime(90, now + 0.1);
+                gain.gain.setValueAtTime(0.1, now); gain.gain.linearRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now); osc.stop(now + 0.1);
+            } else if (type === 'emp') {
+                osc.type = 'sine'; osc.frequency.setValueAtTime(150, now); osc.frequency.exponentialRampToValueAtTime(900, now + 0.35);
+                gain.gain.setValueAtTime(0.3, now); gain.gain.linearRampToValueAtTime(0.01, now + 0.35);
+                osc.start(now); osc.stop(now + 0.35);
+            } else if (type === 'crash') {
+                osc.type = 'square'; osc.frequency.setValueAtTime(120, now); osc.frequency.exponentialRampToValueAtTime(20, now + 0.4);
+                gain.gain.setValueAtTime(0.4, now); gain.gain.linearRampToValueAtTime(0.01, now + 0.4);
+                osc.start(now); osc.stop(now + 0.4);
+            }
+        }
+
+        function playSynthStep() {
+            if (!isRunning || isMusicMuted) return;
+            initAudioContext();
+
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            const now = audioCtx.currentTime;
+            const freq = notes[noteStep % notes.length];
+
+            // Retro Square/Sawtooth Wave sound
+            osc.type = (noteStep % 4 === 0) ? 'sawtooth' : 'square';
+            osc.frequency.setValueAtTime(freq, now);
+
+            // Snappy Envelope
+            gain.gain.setValueAtTime(0.05, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
+
+            osc.start(now);
+            osc.stop(now + 0.12);
+
+            noteStep++;
+        }
+
+        function startMusic() {
+            stopMusic();
+            noteStep = 0;
+            // 120ms Takt für echten 8-Bit Cyberpunk Drive
+            musicInterval = setInterval(playSynthStep, 120);
+        }
+
+        function stopMusic() {
+            if (musicInterval) clearInterval(musicInterval);
+            musicInterval = null;
+        }
+
+        // MUSIC MUTE TOGGLE
+        const musicBtn = document.getElementById('music-btn');
+        musicBtn.addEventListener('click', () => {
+            isMusicMuted = !isMusicMuted;
+            if (isMusicMuted) {
+                musicBtn.textContent = '🔇 MUSIC: OFF';
+                musicBtn.style.color = '#ff0055';
+                musicBtn.style.borderColor = '#ff0055';
+            } else {
+                musicBtn.textContent = '🔊 MUSIC: ON';
+                musicBtn.style.color = '#ffe600';
+                musicBtn.style.borderColor = '#ffe600';
+            }
+        });
+
+        // FULLSCREEN CONTROLLER
+        const fsBtn = document.getElementById('fs-btn');
+        fsBtn.addEventListener('click', () => {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => console.log(err));
+                fsBtn.textContent = '⛶ BEENDEN';
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                    fsBtn.textContent = '⛶ VOLLBILD';
+                }
+            }
+        });
+
+        // THREE.JS SETUP
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x010105, 0.012);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 3.8, 7.5);
+        camera.lookAt(0, 1.2, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        // LIGHTING
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.25);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0x00f0ff, 0.6);
+        dirLight.position.set(10, 20, -10);
+        scene.add(dirLight);
+
+        // HIGHWAY
+        const roadGeo = new THREE.PlaneGeometry(9.5, 400);
+        const roadMat = new THREE.MeshStandardMaterial({ color: 0x05050f, roughness: 0.1, metalness: 0.85 });
+        const road = new THREE.Mesh(roadGeo, roadMat);
+        road.rotation.x = -Math.PI / 2;
+        road.position.z = -180;
+        scene.add(road);
+
+        const gridHelper = new THREE.GridHelper(400, 100, 0x00f0ff, 0xff0055);
+        gridHelper.position.set(0, 0.02, -180);
+        gridHelper.scale.x = 0.024;
+        scene.add(gridHelper);
+
+        // CAR MODEL (SERHAT MANTIS-GT)
+        const carGroup = new THREE.Group();
+
+        const bodyMat = new THREE.MeshStandardMaterial({ color: 0x080812, metalness: 0.9, roughness: 0.2 });
+        const accentMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
+        const tailMat = new THREE.MeshBasicMaterial({ color: 0xff0055 });
+        const glassMat = new THREE.MeshPhysicalMaterial({ color: 0x00f0ff, transmission: 0.8, opacity: 1, transparent: true, roughness: 0 });
+
+        const mainChassis = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.35, 2.8), bodyMat);
+        mainChassis.position.y = 0.35;
+        carGroup.add(mainChassis);
+
+        const cockpit = new THREE.Mesh(new THREE.ConeGeometry(0.7, 1.4, 4), glassMat);
+        cockpit.rotation.x = Math.PI / 2;
+        cockpit.rotation.y = Math.PI / 4;
+        cockpit.position.set(0, 0.65, -0.2);
+        cockpit.scale.set(1, 0.4, 1);
+        carGroup.add(cockpit);
+
+        const wingBaseL = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.4, 0.1), bodyMat);
+        wingBaseL.position.set(-0.6, 0.6, 1.2);
+        const wingBaseR = wingBaseL.clone();
+        wingBaseR.position.x = 0.6;
+        carGroup.add(wingBaseL); carGroup.add(wingBaseR);
+
+        const wingBlade = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.05, 0.3), bodyMat);
+        wingBlade.position.set(0, 0.8, 1.2);
+        carGroup.add(wingBlade);
+
+        const wingNeon = new THREE.Mesh(new THREE.BoxGeometry(1.72, 0.06, 0.05), accentMat);
+        wingNeon.position.set(0, 0.8, 1.33);
+        carGroup.add(wingNeon);
+
+        const jetGeo = new THREE.CylinderGeometry(0.15, 0.2, 0.5, 8);
+        const jetMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff, wireframe: true });
+        const jetL = new THREE.Mesh(jetGeo, jetMat);
+        jetL.rotation.x = Math.PI / 2;
+        jetL.position.set(-0.35, 0.35, 1.4);
+        const jetR = jetL.clone();
+        jetR.position.x = 0.35;
+        carGroup.add(jetL); carGroup.add(jetR);
+
+        const wheelGeo = new THREE.CylinderGeometry(0.32, 0.32, 0.25, 16);
+        const wheelMat = new THREE.MeshStandardMaterial({ color: 0x020202, roughness: 0.5 });
+        const hubMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
+
+        const wheelPositions = [
+            [-0.85, 0.32, -0.9], [0.85, 0.32, -0.9],
+            [-0.85, 0.32, 0.9],  [0.85, 0.32, 0.9]
+        ];
+
+        let wheels = [];
+        wheelPositions.forEach(pos => {
+            const wGroup = new THREE.Group();
+            const wMesh = new THREE.Mesh(wheelGeo, wheelMat);
+            wMesh.rotation.z = Math.PI / 2;
+            wGroup.add(wMesh);
+
+            const hub = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.4, 0.4), hubMat);
+            hub.position.x = pos[0] > 0 ? 0.13 : -0.13;
+            wGroup.add(hub);
+
+            wGroup.position.set(...pos);
+            carGroup.add(wGroup);
+            wheels.push(wGroup);
+        });
+
+        const headLightL = new THREE.SpotLight(0x00f0ff, 5, 30, Math.PI / 7, 0.5);
+        headLightL.position.set(-0.55, 0.4, -1.3);
+        headLightL.target.position.set(-0.55, 0, -25);
+        carGroup.add(headLightL); carGroup.add(headLightL.target);
+
+        const headLightR = headLightL.clone();
+        headLightR.position.x = 0.55;
+        headLightR.target.position.set(0.55, 0, -25);
+        carGroup.add(headLightR); carGroup.add(headLightR.target);
+
+        const tailLight = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.08, 0.05), tailMat);
+        tailLight.position.set(0, 0.45, 1.41);
+        carGroup.add(tailLight);
+
+        scene.add(carGroup);
+
+        // BOSS ENEMY (CYBER-HUNTER X)
+        const bossGroup = new THREE.Group();
+        const bossGeo = new THREE.OctahedronGeometry(3.5, 2);
+        const bossMat = new THREE.MeshStandardMaterial({ color: 0xff0055, wireframe: true, metalness: 0.9 });
+        const bossMesh = new THREE.Mesh(bossGeo, bossMat);
+        bossGroup.add(bossMesh);
+        bossGroup.position.set(0, 6.5, -90);
+        bossGroup.visible = false;
+        scene.add(bossGroup);
+
+        // GAME STATE
+        let isRunning = false;
+        let score = 0;
+        let empCharges = 1;
+        const lanePositions = [-2.8, 0, 2.8];
+        let currentLane = 1;
+        let targetX = lanePositions[1];
+        let speed = 0.85;
+        let spawnTimer = 0;
+
+        let obstacles = [];
+        let particles = [];
+        let bossActive = false;
+
+        // CONTROLS - TASTATUR
+        document.addEventListener('keydown', (e) => {
+            if (!isRunning) return;
+            if ((e.key === 'a' || e.key === 'ArrowLeft') && currentLane > 0) {
+                currentLane--; targetX = lanePositions[currentLane]; playAudio('shift');
+            }
+            if ((e.key === 'd' || e.key === 'ArrowRight') && currentLane < 2) {
+                currentLane++; targetX = lanePositions[currentLane]; playAudio('shift');
+            }
+            if (e.code === 'Space' && empCharges > 0) {
+                triggerEMP();
+            }
+        });
+
+        // CONTROLS - MOBILE SWIPE (WISCH-STEUERUNG)
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let lastTapTime = 0;
+
+        window.addEventListener('touchstart', (e) => {
+            touchStartX = e.changedTouches[0].screenX;
+            touchStartY = e.changedTouches[0].screenY;
+
+            const currentTime = new Date().getTime();
+            const tapLength = currentTime - lastTapTime;
+            if (tapLength < 300 && tapLength > 0 && empCharges > 0 && isRunning) {
+                triggerEMP();
+            }
+            lastTapTime = currentTime;
+        }, { passive: true });
+
+        window.addEventListener('touchend', (e) => {
+            if (!isRunning) return;
+            const touchEndX = e.changedTouches[0].screenX;
+            const touchEndY = e.changedTouches[0].screenY;
+            const diffX = touchEndX - touchStartX;
+            const diffY = touchEndY - touchStartY;
+
+            if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 30) {
+                if (diffX < 0 && currentLane > 0) {
+                    currentLane--; targetX = lanePositions[currentLane]; playAudio('shift');
+                } else if (diffX > 0 && currentLane < 2) {
+                    currentLane++; targetX = lanePositions[currentLane]; playAudio('shift');
+                }
+            }
+        }, { passive: true });
+
+        document.getElementById('start-btn').addEventListener('click', startGame);
+        document.getElementById('restart-btn').addEventListener('click', startGame);
+
+        function startGame() {
+            score = 0; speed = 0.85; empCharges = 1; currentLane = 1; targetX = lanePositions[1];
+            carGroup.position.set(0, 0, 0); bossActive = false; bossGroup.visible = false;
+            spawnTimer = 0;
+            document.getElementById('boss-warn').style.display = 'none';
+            document.getElementById('emp-val').textContent = 'EMP: READY [SPACE / DOUBLE TAP]';
+            document.getElementById('emp-val').style.color = '#00f0ff';
+
+            obstacles.forEach(o => scene.remove(o.mesh));
+            obstacles = [];
+
+            isRunning = true;
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('over-screen').classList.add('hidden');
+
+            startMusic();
+        }
+
+        function triggerEMP() {
+            empCharges--;
+            playAudio('emp');
+            document.getElementById('emp-val').textContent = 'EMP: DEPLETED';
+            document.getElementById('emp-val').style.color = '#ff0055';
+
+            obstacles.forEach(o => {
+                createExplosion(o.mesh.position);
+                scene.remove(o.mesh);
+            });
+            obstacles = [];
+        }
+
+        function spawnObstacleWave() {
+            let availableLanes = [0, 1, 2];
+            availableLanes.sort(() => Math.random() - 0.5);
+            const count = Math.random() < 0.65 ? 1 : 2;
+
+            for (let i = 0; i < count; i++) {
+                const lane = availableLanes[i];
+                const obsGroup = new THREE.Group();
+
+                const coreGeo = new THREE.IcosahedronGeometry(0.7, 1);
+                const coreMat = new THREE.MeshBasicMaterial({ color: 0xff0055, wireframe: true });
+                const core = new THREE.Mesh(coreGeo, coreMat);
+                obsGroup.add(core);
+
+                const ringGeo = new THREE.TorusGeometry(1.0, 0.08, 8, 24);
+                const ringMat = new THREE.MeshStandardMaterial({ color: 0x222233, metalness: 0.9 });
+                const ring = new THREE.Mesh(ringGeo, ringMat);
+                obsGroup.add(ring);
+
+                obsGroup.position.set(lanePositions[lane], 0.85, -130);
+                scene.add(obsGroup);
+                obstacles.push({ mesh: obsGroup, ring: ring, lane: lane });
+            }
+        }
+
+        function createExplosion(pos) {
+            for(let i = 0; i < 25; i++) {
+                const pGeo = new THREE.BoxGeometry(0.18, 0.18, 0.18);
+                const pMat = new THREE.MeshBasicMaterial({ color: Math.random() < 0.5 ? 0x00f0ff : 0xff0055 });
+                const pMesh = new THREE.Mesh(pGeo, pMat);
+                pMesh.position.copy(pos);
+                pMesh.userData = {
+                    vx: (Math.random() - 0.5) * 0.6,
+                    vy: Math.random() * 0.5 + 0.1,
+                    vz: (Math.random() - 0.5) * 0.6,
+                    life: 1.0
+                };
+                scene.add(pMesh);
+                particles.push(pMesh);
+            }
+        }
+
+        // MAIN LOOP
+        let clock = new THREE.Clock();
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+
+            if (isRunning) {
+                speed += delta * 0.015;
+                score += Math.floor(speed * 1.5);
+                document.getElementById('score-val').textContent = String(score).padStart(6, '0');
+
+                carGroup.position.x += (targetX - carGroup.position.x) * 0.15;
+                carGroup.rotation.z = -(targetX - carGroup.position.x) * 0.18;
+                carGroup.rotation.y = (targetX - carGroup.position.x) * 0.05;
+                carGroup.position.y = Math.sin(clock.getElapsedTime() * 15) * 0.03;
+
+                wheels.forEach(w => {
+                    w.children[0].rotation.x += speed * 0.3;
+                });
+
+                gridHelper.position.z += speed;
+                if (gridHelper.position.z > -140) gridHelper.position.z = -180;
+
+                if (score >= 1200 && !bossActive) {
+                    bossActive = true;
+                    bossGroup.visible = true;
+                    document.getElementById('boss-warn').style.display = 'block';
+                }
+
+                if (bossActive) {
+                    bossGroup.rotation.y += 0.02;
+                    bossGroup.rotation.z += 0.01;
+                    bossGroup.position.x = Math.sin(clock.getElapsedTime() * 2) * 3;
+                }
+
+                spawnTimer += speed;
+                if (spawnTimer > 35) {
+                    spawnObstacleWave();
+                    spawnTimer = 0;
+                }
+
+                for (let i = obstacles.length - 1; i >= 0; i--) {
+                    let o = obstacles[i];
+                    o.mesh.position.z += speed;
+                    o.ring.rotation.x += 0.04;
+                    o.ring.rotation.y += 0.04;
+
+                    if (o.mesh.position.z > -1.2 && o.mesh.position.z < 1.2) {
+                        if (Math.abs(o.mesh.position.x - carGroup.position.x) < 1.3) {
+                            playAudio('crash');
+                            stopMusic();
+                            createExplosion(carGroup.position);
+                            isRunning = false;
+                            document.getElementById('final-stats').textContent = `FINAL SCORE: ${String(score).padStart(6, '0')}`;
+                            document.getElementById('over-screen').classList.remove('hidden');
+                        }
+                    }
+
+                    if (o.mesh.position.z > 10) {
+                        scene.remove(o.mesh);
+                        obstacles.splice(i, 1);
+                    }
+                }
+
+                for (let i = particles.length - 1; i >= 0; i--) {
+                    let p = particles[i];
+                    p.position.x += p.userData.vx;
+                    p.position.y += p.userData.vy;
+                    p.position.z += p.userData.vz;
+                    p.userData.life -= 0.025;
+                    p.scale.setScalar(p.userData.life);
+
+                    if (p.userData.life <= 0) {
+                        scene.remove(p);
+                        particles.splice(i, 1);
+                    }
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>
